@@ -9,6 +9,10 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
+/**
+ * BlockEntity for modular furnace blocks.
+ * Stores reference to master block of the multiblock structure.
+ */
 public class ModularFurnaceBlockEntity extends BlockEntity {
 
     private BlockPos masterPos = null;
@@ -17,12 +21,20 @@ public class ModularFurnaceBlockEntity extends BlockEntity {
         super(ModBlockEntityTypes.MODULAR_FURNACE.get(), pos, state);
     }
 
-    // ВОЗВРАЩАЕМ МЕТОД TICK ДЛЯ ТИКЕРА БЛОКА
+    /**
+     * Tick method for furnace logic.
+     * Called every game tick for active furnaces.
+     */
     public static void tick(Level level, BlockPos pos, BlockState state, ModularFurnaceBlockEntity blockEntity) {
-        // Здесь в будущем будет общая плавка предметов
+        // TODO: Implement furnace smelting logic here
     }
 
-    // ВОЗВРАЩАЕМ МЕТОД GETMASTER ДЛЯ КЛИКА ПКМ ПО БЛОКУ
+    /**
+     * Get the master BlockEntity for this structure.
+     * The master is responsible for coordinating the entire multiblock.
+     * 
+     * @return Master BlockEntity, or this block if no master exists
+     */
     public ModularFurnaceBlockEntity getMaster() {
         if (level != null && hasMaster()) {
             BlockEntity be = level.getBlockEntity(masterPos);
@@ -30,36 +42,55 @@ public class ModularFurnaceBlockEntity extends BlockEntity {
                 return masterBE;
             }
         }
-        return this; // Если мастера нет, этот блок сам себе мастер
+        return this; // Fallback: this block is its own master
     }
 
+    /**
+     * Set the master block for this furnace.
+     * Called when structure is formed or broken.
+     * 
+     * @param pos Position of master block, or null to isolate this block
+     */
     public void setMaster(BlockPos pos) {
-        if (java.util.Objects.equals(this.masterPos, pos)) return;
+        if (java.util.Objects.equals(this.masterPos, pos)) {
+            return; // No change
+        }
+        
         this.masterPos = pos;
         setChanged();
         
         if (level != null) {
-            // Флаг 3 обновляет блок на клиенте и сервере
+            // Sync with client
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
             
-            // КРИТИЧЕСКИЙ МОМЕНТ: Заставляем модель обновиться
+            // Request model update on client side
             if (level.isClientSide) {
                 requestModelDataUpdate();
-                // "Пингуем" соседей, чтобы они тоже перерисовали свои швы
+                // Notify neighbors to update their render state
                 level.setBlocksDirty(worldPosition, getBlockState(), getBlockState());
             }
         }
     }
 
+    /**
+     * Get the position of the master block.
+     * 
+     * @return Master block position, or this block's position if no master
+     */
     public BlockPos getMasterPos() {
         return masterPos != null ? masterPos : this.worldPosition;
     }
 
+    /**
+     * Check if this block has a master in a structure.
+     * 
+     * @return true if this block is part of a multiblock, false if isolated
+     */
     public boolean hasMaster() {
         return masterPos != null;
     }
 
-    // --- СИНХРОНИЗАЦИЯ С КЛИЕНТОМ ---
+    // --- SYNCHRONIZATION WITH CLIENT ---
 
     @Override
     public ClientboundBlockEntityDataPacket getUpdatePacket() {
@@ -89,9 +120,10 @@ public class ModularFurnaceBlockEntity extends BlockEntity {
         } else {
             this.masterPos = null;
         }
+        
+        // Request model update on client side
         if (level != null && level.isClientSide) {
             requestModelDataUpdate();
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
         }
     }
 }
